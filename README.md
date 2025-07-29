@@ -1,39 +1,90 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# TTS Voices
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+A Flutter package that provides text-to-speech (TTS) Vietnamese functionality with configurable AI avatar voices for dynamic character-based speech synthesis.
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- **Configurable Voice Parameters**: Support for gender (male, female), age (child, adult, old), and pitch (low, standard, high) combinations
+- **AI Avatar Characters**: Pre-defined character voices with distinct personalities:
+  - **Natra**: Male, child, high pitch
+  - **Dat Ky**: Female, adult, normal pitch  
+  - **Khuong Tu Nha**: Male, old, low pitch
+  - **Standard**: Male, adult, normal pitch (fallback voice)
+- **Context-Aware Voice Selection**: Adapts voice based on user preferences and timing
+- **Cross-Platform Support**: Consistent voice experience across Web and Android platforms
+- **Fallback System**: Automatic fallback to Standard voice for unsupported scenarios
 
-## Getting started
+## Getting Started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+Add this package to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  tts_voices: ^0.0.1
+```
+
+Then run:
+```bash
+flutter pub get
+```
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
+### Basic Text-to-Speech
 
 ```dart
-const like = 'sample';
+import 'package:tts_voices/tts_voices.dart';
+
+// Create a voice configuration
+final voiceConfig = VoiceConfig(
+  gender: Gender.male,
+  age: Age.adult,
+  pitch: Pitch.standard,
+);
+
+// Speak text with the configured voice
+await speak("Xin chào, tôi là trợ lý Tử Vi của bạn.", voiceConfig);
 ```
 
-## Additional information
+### Using Pre-defined Character Voices
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+```dart
+// Use Natra character voice (male, child, high)
+await speak("Chào! Natra đây! Hôm nay cậu muốn hỏi gì về tử vi?", VoiceConfig.natra());
+
+// Use Dat Ky character voice (female, adult, normal)
+await speak("Xin chào, ta là Đát Kỷ. Ta sẽ giúp ngươi giải đáp những thắc mắc về vận mệnh.", VoiceConfig.datKy());
+
+// Use Khuong Tu Nha character voice (male, old, high)
+await speak("Lão phu Khương Tử Nha đây. Hãy đến gần và hỏi lão về số phận của ngươi.", VoiceConfig.khuongTuNha());
+
+// Fallback to Standard voice
+await speak("Xin chào, tôi là trợ lý tử vi của bạn.", VoiceConfig.standard());
+```
+
+## Implementation Roadmap
+
+### Phase 1: Standard Voice (Current)
+- ✅ Implement `Future<void> speak(String text, VoiceConfig config)` function
+- ✅ Standard Male voice using flutter_tts
+- ✅ Cross-platform compatibility (Web and Android)
+
+### Phase 2: Advanced Character Voices (Upcoming)
+- 🔄 Integration with Google Cloud Text-To-Speech SDK
+- 🔄 Implementation of Natra, Dat Ky, and Khuong Tu Nha character voices
+- 🔄 Context-dependent voice selection logic
+- 🔄 Enhanced voice quality and character personality matching
+
+## Platform Support
+
+| Platform | Status | Implementation |
+|----------|--------|----------------|
+| Android  | ✅ Supported | flutter_tts |
+| Web      | ✅ Supported | flutter_tts |
+| iOS      | 🔄 Planned | flutter_tts |
+
+## Additional Information
+
+This package is designed for applications requiring dynamic, character-based text-to-speech functionality. The voice selection system automatically adapts based on user preferences and context, providing an immersive audio experience.
+
+For issues, feature requests, or contributions, please visit our repository or contact the development team.
