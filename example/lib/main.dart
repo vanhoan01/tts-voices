@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tts_voices/tts_voices.dart';
 
 void main() {
   runApp(const MyApp());
@@ -7,116 +8,298 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Vietnamese TTS',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const TtsVoiceDemo(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class TtsVoiceDemo extends StatefulWidget {
+  const TtsVoiceDemo({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<TtsVoiceDemo> createState() => _TtsVoiceDemoState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class _TtsVoiceDemoState extends State<TtsVoiceDemo> {
+  final VietnameseTts _tts = VietnameseTts();
+  final TextEditingController _textController = TextEditingController();
 
-  void _incrementCounter() {
+  // Voice configuration
+  String _gender = 'female';
+  String _age = 'adult';
+  double _pitch = 1.0;
+  double _rate = 0.5;
+  double _volume = 1.0;
+
+  String _statusMessage = '';
+
+  TtsState get ttsState => _tts.ttsState;
+
+  @override
+  void initState() {
+    super.initState();
+    _tts.onStateChanged = () {
+      setState(() {}); // Update the UI when TTS state changes
+    };
+    _checkTtsAvailability();
+  }
+
+  Future<void> _checkTtsAvailability() async {
+    bool isAvailable = await _tts.isVietnameseAvailable();
+
+    String status;
+    if (isAvailable) {
+      status = '';
+    } else {
+      final defaultVoice = await _tts.getDefaultVoice();
+      final fallbackLang =
+          defaultVoice['locale'] ??
+          defaultVoice['language'] ??
+          defaultVoice['name'] ??
+          'unknown';
+      status = 'Vietnamese TTS unavailable, using $fallbackLang instead.';
+    }
+
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      _statusMessage = status;
     });
   }
 
   @override
+  void dispose() {
+    _tts.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
+
+  void _speak() async {
+    final config = VoiceConfig(
+      gender: _gender,
+      age: _age,
+      pitch: _pitch,
+      rate: _rate,
+      volume: _volume,
+    );
+
+    try {
+      await _tts.speak(_textController.text, config);
+    } catch (e) {
+      debugPrint("Error: $e");
+    }
+  }
+
+  void _stop() async {
+    await _tts.stop();
+  }
+
+  void _pause() async {
+    await _tts.pause();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
+        title: const Text('Vietnamese TTS'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Text input
+              TextField(
+                controller: _textController,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Enter Vietnamese text to speak',
+                ),
+                onTapOutside: (event) => FocusScope.of(context).unfocus(),
+              ),
+              const SizedBox(height: 16),
+
+              // Status message
+              if (_statusMessage.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(8.0),
+                  color: Colors.grey[200],
+                  child: Text(
+                    _statusMessage,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              const SizedBox(height: 16),
+
+              // Control buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ttsState == TtsState.playing || ttsState == TtsState.continued
+                      ? ElevatedButton.icon(
+                        onPressed: _pause,
+                        icon: const Icon(Icons.pause),
+                        label: const Text('Pause'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                        ),
+                      )
+                      : ElevatedButton.icon(
+                        onPressed: _speak,
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Play'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                  ElevatedButton.icon(
+                    onPressed: _stop,
+                    icon: const Icon(Icons.stop),
+                    label: const Text('Stop'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Gender selection
+              Row(
+                children: [
+                  const Text('Gender:'),
+                  const SizedBox(width: 16),
+                  ChoiceChip(
+                    label: const Text('Female'),
+                    selected: _gender == 'female',
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _gender = 'female';
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Male'),
+                    selected: _gender == 'male',
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _gender = 'male';
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Age selection
+              Row(
+                children: [
+                  const Text('Age:'),
+                  const SizedBox(width: 16),
+                  ChoiceChip(
+                    label: const Text('Child'),
+                    selected: _age == 'child',
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _age = 'child';
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Adult'),
+                    selected: _age == 'adult',
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _age = 'adult';
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Senior'),
+                    selected: _age == 'senior',
+                    onSelected: (selected) {
+                      if (selected) {
+                        setState(() {
+                          _age = 'senior';
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Voice controls
+              const Text('Pitch:'),
+              Slider(
+                value: _pitch,
+                min: 0.5,
+                max: 2.0,
+                divisions: 15,
+                label: _pitch.toStringAsFixed(1),
+                onChanged: (value) {
+                  setState(() {
+                    _pitch = value;
+                  });
+                },
+              ),
+
+              const Text('Rate:'),
+              Slider(
+                value: _rate,
+                min: 0.0,
+                max: 1.0,
+                divisions: 10,
+                label: _rate.toStringAsFixed(1),
+                onChanged: (value) {
+                  setState(() {
+                    _rate = value;
+                  });
+                },
+              ),
+
+              const Text('Volume:'),
+              Slider(
+                value: _volume,
+                min: 0.0,
+                max: 1.0,
+                divisions: 10,
+                label: _volume.toStringAsFixed(1),
+                onChanged: (value) {
+                  setState(() {
+                    _volume = value;
+                  });
+                },
+              ),
+            ],
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
