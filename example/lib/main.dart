@@ -34,8 +34,8 @@ class _TtsVoiceDemoState extends State<TtsVoiceDemo> {
   final TextEditingController _textController = TextEditingController();
 
   // Voice configuration
-  String _gender = 'female';
-  String _age = 'adult';
+  Gender _gender = Gender.female;
+  Age _age = Age.adult;
   double _pitch = 1.0;
   double _rate = 0.5;
   double _volume = 1.0;
@@ -50,23 +50,25 @@ class _TtsVoiceDemoState extends State<TtsVoiceDemo> {
     _tts.onStateChanged = () {
       setState(() {}); // Update the UI when TTS state changes
     };
-    _checkTtsAvailability();
   }
 
-  Future<void> _checkTtsAvailability() async {
-    bool isAvailable = await _tts.isVietnameseAvailable();
+  Future<void> _updateVoiceStatus(VoiceConfig config) async {
+    final bestVoice = await _tts.findBestVoice(config);
 
     String status;
-    if (isAvailable) {
+    if (bestVoice != null && bestVoice.isVietnamese) {
       status = '';
-    } else {
-      final defaultVoice = await _tts.getDefaultVoice();
+    } else if (bestVoice != null) {
       final fallbackLang =
-          defaultVoice['locale'] ??
-          defaultVoice['language'] ??
-          defaultVoice['name'] ??
-          'unknown';
+          bestVoice.locale.isNotEmpty
+              ? bestVoice.locale
+              : (bestVoice.data['language'] ??
+                      bestVoice.data['name'] ??
+                      'unknown')
+                  .toString();
       status = 'Vietnamese TTS unavailable, using $fallbackLang instead.';
+    } else {
+      status = 'No TTS voice available.';
     }
 
     setState(() {
@@ -91,6 +93,7 @@ class _TtsVoiceDemoState extends State<TtsVoiceDemo> {
     );
 
     try {
+      await _updateVoiceStatus(config);
       await _tts.speak(_textController.text, config);
     } catch (e) {
       debugPrint("Error: $e");
@@ -183,29 +186,26 @@ class _TtsVoiceDemoState extends State<TtsVoiceDemo> {
                 children: [
                   const Text('Gender:'),
                   const SizedBox(width: 16),
-                  ChoiceChip(
-                    label: const Text('Female'),
-                    selected: _gender == 'female',
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _gender = 'female';
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('Male'),
-                    selected: _gender == 'male',
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _gender = 'male';
-                        });
-                      }
-                    },
-                  ),
+                  ...Gender.values
+                      .where((g) => g != Gender.unknown)
+                      .map(
+                        (g) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(
+                              g.name[0].toUpperCase() + g.name.substring(1),
+                            ),
+                            selected: _gender == g,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() {
+                                  _gender = g;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -215,40 +215,35 @@ class _TtsVoiceDemoState extends State<TtsVoiceDemo> {
                 children: [
                   const Text('Age:'),
                   const SizedBox(width: 16),
-                  ChoiceChip(
-                    label: const Text('Child'),
-                    selected: _age == 'child',
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _age = 'child';
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('Adult'),
-                    selected: _age == 'adult',
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _age = 'adult';
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: const Text('Senior'),
-                    selected: _age == 'senior',
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _age = 'senior';
-                        });
-                      }
-                    },
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          ...Age.values
+                              .where((a) => a != Age.unknown)
+                              .map(
+                                (a) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    label: Text(
+                                      a.name[0].toUpperCase() +
+                                          a.name.substring(1),
+                                    ),
+                                    selected: _age == a,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setState(() {
+                                          _age = a;
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
