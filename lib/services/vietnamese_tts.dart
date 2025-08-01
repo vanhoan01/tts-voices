@@ -5,6 +5,8 @@ import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+
+import '../models/flutter_tts_voice.dart';
 import '../models/voice_config.dart';
 
 enum TtsState { playing, stopped, paused, continued }
@@ -67,19 +69,6 @@ class VietnameseTts {
     });
   }
 
-  /// Check if there is a Vietnamese voice available
-  Future<bool> hasVietnameseVoice() async {
-    final voices = await _flutterTts.getVoices;
-    return voices.any((voice) {
-      final map = <String, dynamic>{};
-      (voice as Map).forEach((key, value) {
-        map[key.toString()] = value;
-      });
-      final locale = map['locale'] ?? map['language'] ?? '';
-      return locale.toString().startsWith('vi');
-    });
-  }
-
   /// Speak with fallback if Vietnamese voice is not available
   Future<void> speak(String text, VoiceConfig config) async {
     if (text.isEmpty) return;
@@ -94,65 +83,9 @@ class VietnameseTts {
     await _flutterTts.setPitch(config.pitch);
     await _flutterTts.setSpeechRate(config.rate);
 
-    final voices = await _flutterTts.getVoices;
-    Map<String, dynamic>? selectedVoice;
-
-    // Convert all voices to Map<String, dynamic>
-    final List<Map<String, dynamic>> mappedVoices =
-        voices
-            .map((voice) {
-              final map = <String, dynamic>{};
-              (voice as Map).forEach((key, value) {
-                map[key.toString()] = value;
-              });
-              return map;
-            })
-            .toList()
-            .cast<Map<String, dynamic>>();
-
-    // List of prioritized conditions
-    final List<bool Function(Map<String, dynamic>)> conditions = [
-      // 1. Match both gender and age
-      (map) =>
-          (map['locale'] ?? map['language'] ?? '').toString().startsWith(
-            'vi',
-          ) &&
-          (map['gender'] ?? '').toString().toLowerCase() ==
-              config.gender.toLowerCase() &&
-          (map['age'] ?? '').toString().toLowerCase() ==
-              config.age.toLowerCase(),
-      // 2. Match either gender or age
-      (map) =>
-          (map['locale'] ?? map['language'] ?? '').toString().startsWith(
-            'vi',
-          ) &&
-          ((map['gender'] ?? '').toString().toLowerCase() ==
-                  config.gender.toLowerCase() ||
-              (map['age'] ?? '').toString().toLowerCase() ==
-                  config.age.toLowerCase()),
-      // 3. Any Vietnamese voice
-      (map) =>
-          (map['locale'] ?? map['language'] ?? '').toString().startsWith('vi'),
-    ];
-
-    // Find the voice that satisfies the highest priority condition
-    for (final condition in conditions) {
-      selectedVoice = mappedVoices.firstWhereOrNull(condition);
-      if (selectedVoice != null && selectedVoice.isNotEmpty) break;
-    }
-
-    if (selectedVoice != null && selectedVoice.isNotEmpty) {
-      final Map<String, String> stringVoiceMap = {};
-      selectedVoice.forEach((key, value) {
-        if (value != null) {
-          stringVoiceMap[key.toString()] = value.toString();
-        }
-      });
-      await _flutterTts.setVoice(stringVoiceMap);
-    } else {
-      // Fallback: use default voice
-      final defaultVoice = await getDefaultVoice();
-      await _flutterTts.setVoice(defaultVoice);
+    final selectedVoice = await findBestVoice(config);
+    if (selectedVoice != null) {
+      await _flutterTts.setVoice(selectedVoice.toStringMap());
     }
 
     // Speak the text
@@ -169,22 +102,49 @@ class VietnameseTts {
     await _flutterTts.pause();
   }
 
-  Future<Map<String, String>> getDefaultVoice() async {
+  /// Returns the most suitable voice for the config (or fallback)
+  Future<FlutterTtsVoice?> findBestVoice(VoiceConfig config) async {
+    final voices = await _flutterTts.getVoices;
+    final ttsVoices = List<FlutterTtsVoice>.from(
+      voices.map((voice) {
+        final map = <String, dynamic>{};
+        (voice as Map).forEach((key, value) {
+          map[key.toString()] = value;
+        });
+        return FlutterTtsVoice(map);
+      }),
+    );
+
+    // 1. Match both gender and age
+    FlutterTtsVoice? selectedVoice = ttsVoices.firstWhereOrNull(
+      (v) => v.matchConfig(config),
+    );
+    // 2. Match either gender or age
+    selectedVoice ??= ttsVoices.firstWhereOrNull(
+      (v) => v.matchConfigPartial(config),
+    );
+    // 3. Any Vietnamese voice
+    selectedVoice ??= ttsVoices.firstWhereOrNull((v) => v.isVietnamese);
+
+    // 4. Fallback: use default voice
+    selectedVoice ??= await getDefaultVoice();
+    return selectedVoice;
+  }
+
+  /// Returns the default voice (or the first voice if not available)
+  Future<FlutterTtsVoice?> getDefaultVoice() async {
     if (kIsWeb) {
-      // Web does not support getDefaultVoice, fallback to the first voice
       final voices = await _flutterTts.getVoices;
       if (voices.isNotEmpty) {
         final first = voices.first as Map;
-        final Map<String, String> stringVoiceMap = {};
+        final map = <String, dynamic>{};
         first.forEach((key, value) {
-          if (value != null) {
-            stringVoiceMap[key.toString()] = value.toString();
-          }
+          map[key.toString()] = value;
         });
-        return stringVoiceMap;
+        return FlutterTtsVoice(map);
       }
       debugPrint('No voices available');
-      return {};
+      return null;
     }
 
     final voice = await _flutterTts.getDefaultVoice;
@@ -192,28 +152,24 @@ class VietnameseTts {
       final voices = await _flutterTts.getVoices;
       if (voices.isNotEmpty) {
         final first = voices.first as Map;
-        final Map<String, String> stringVoiceMap = {};
+        final map = <String, dynamic>{};
         first.forEach((key, value) {
-          if (value != null) {
-            stringVoiceMap[key.toString()] = value.toString();
-          }
+          map[key.toString()] = value;
         });
-        return stringVoiceMap;
+        return FlutterTtsVoice(map);
       }
       debugPrint('No voices available');
-      return {};
+      return null;
     }
-    final Map<String, String> stringVoiceMap = {};
+    final map = <String, dynamic>{};
     (voice as Map).forEach((key, value) {
-      if (value != null) {
-        stringVoiceMap[key.toString()] = value.toString();
-      }
+      map[key.toString()] = value.toString();
     });
-    return stringVoiceMap;
+    return FlutterTtsVoice(map);
   }
 
-  /// Get a list of all available voices
-  Future<List<Map<String, dynamic>>> getAvailableVoices() async {
+  /// Get a list of available VoiceConfig for the current platform
+  Future<List<VoiceConfig>> getAvailableVoices() async {
     try {
       final voices = await _flutterTts.getVoices;
       return voices.map((voice) {
@@ -221,10 +177,16 @@ class VietnameseTts {
         (voice as Map).forEach((key, value) {
           map[key.toString()] = value;
         });
-        return map;
+        return VoiceConfig(
+          gender: VoiceConfig.genderFromString(map['gender']),
+          age: VoiceConfig.ageFromString(map['age']),
+          pitch: 1.0, // Default, as pitch/rate/volume are not in voice meta
+          rate: 0.5,
+          volume: 1.0,
+        );
       }).toList();
     } catch (e) {
-      debugPrint('Error getting voices: $e');
+      debugPrint('Error getting voice configs: $e');
       return [];
     }
   }
